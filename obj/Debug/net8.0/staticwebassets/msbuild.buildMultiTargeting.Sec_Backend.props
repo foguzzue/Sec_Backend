@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\Sec_Backend.props" />
+</Project>
