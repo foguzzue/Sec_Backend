@@ -7,7 +7,7 @@ namespace Sec_Backend.Models
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
-        public required string Id { get; set; }
+        public string? Id { get; set; }
 
         [BsonElement("email")]
         public string? Email { get; set; }
@@ -19,6 +19,15 @@ namespace Sec_Backend.Models
         public string? Username { get; set; }
 
         [BsonElement("createdAt")]
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class UserLogin
+    {
+        [BsonElement("email")]
+        public string Email { get; set; } = null!; // Required email field
+
+        [BsonElement("password")]
+        public string Password { get; set; } = null!; // Required password field
     }
 }

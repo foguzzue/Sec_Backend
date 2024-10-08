@@ -11,36 +11,35 @@ using System.Text;
 using Sec_Backend.Models;
 using Sec_Backend.Services;
 using MongoDB.Bson;
-using Microsoft.Extensions.Configuration; // Add this
+using Microsoft.AspNetCore.Authorization;
 
 namespace Sec_Backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class UsersController : ControllerBase
     {
         private readonly IMongoCollection<Users> _context;
-        private readonly IConfiguration _configuration; // Add this
+        private readonly IConfiguration _configuration;
 
-        // Modify constructor to inject IConfiguration
         public UsersController(MongoDbService mongoDbService, IConfiguration configuration)
         {
             _context = mongoDbService.Database.GetCollection<Users>("users");
-            _configuration = configuration; // Set the _configuration
+            _configuration = configuration;
         }
 
         // REGISTER
         [HttpPost("register")]
+        [AllowAnonymous]
         public async Task<IActionResult> Register([FromBody] Users user)
         {
-            // Check if the email already exists
             var existingUser = await _context.Find(u => u.Email == user.Email).FirstOrDefaultAsync();
             if (existingUser != null)
             {
                 return BadRequest("Email is already registered.");
             }
 
-            // Hash the password
             user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
             user.CreatedAt = DateTime.Now;
 
@@ -51,17 +50,18 @@ namespace Sec_Backend.Controllers
 
         // LOGIN
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] Users user)
+        [AllowAnonymous]
+        public async Task<IActionResult> Login([FromBody] UserLogin login)
         {
             // Find user by email
-            var existingUser = await _context.Find(u => u.Email == user.Email).FirstOrDefaultAsync();
+            var existingUser = await _context.Find(u => u.Email == login.Email).FirstOrDefaultAsync();
             if (existingUser == null)
             {
                 return Unauthorized("Invalid email or password.");
             }
 
             // Verify password
-            if (!BCrypt.Net.BCrypt.Verify(user.Password, existingUser.Password))
+            if (!BCrypt.Net.BCrypt.Verify(login.Password, existingUser.Password))
             {
                 return Unauthorized("Invalid email or password.");
             }
@@ -75,17 +75,45 @@ namespace Sec_Backend.Controllers
         // Generate JWT Token
         private string GenerateJwtToken(Users user)
         {
+            // ตรวจสอบค่าของ user
+            if (user == null)
+            {
+                throw new ArgumentNullException(nameof(user), "User cannot be null.");
+            }
+
+            if (string.IsNullOrEmpty(user.Id))
+            {
+                throw new ArgumentException("User ID cannot be null or empty.", nameof(user.Id));
+            }
+
+            if (string.IsNullOrEmpty(user.Email))
+            {
+                throw new ArgumentException("User Email cannot be null or empty.", nameof(user.Email));
+            }
+
+            // สำหรับ Username ถ้า null ให้คืนค่าข้อความแสดงข้อผิดพลาด
+            if (string.IsNullOrEmpty(user.Username))
+            {
+                throw new ArgumentException("User Username cannot be null or empty.", nameof(user.Username));
+            }
+
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]);
+            var secretKey = _configuration["Jwt:SecretKey"];
+            if (string.IsNullOrEmpty(secretKey))
+            {
+                throw new InvalidOperationException("JWT SecretKey is not configured.");
+            }
+
+            var key = Encoding.ASCII.GetBytes(secretKey);
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                    new Claim(ClaimTypes.Email, user.Email),
-                    new Claim(ClaimTypes.Name, user.Username)
-                }),
+            new Claim(ClaimTypes.NameIdentifier, user.Id),
+            new Claim(ClaimTypes.Email, user.Email),
+            new Claim(ClaimTypes.Name, user.Username)
+        }),
                 Expires = DateTime.UtcNow.AddHours(48), // Token valid for 48 hours
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
