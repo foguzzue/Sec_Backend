@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Work\\Y4.1\\Security\\Backend\\Sec_Backend\\Sec_Backend.csproj": {}
+    "D:\\Work\\Y4.1\\Security\\git\\Sec_Backend\\Sec_Backend.csproj": {}
   },
   "projects": {
-    "D:\\Work\\Y4.1\\Security\\Backend\\Sec_Backend\\Sec_Backend.csproj": {
+    "D:\\Work\\Y4.1\\Security\\git\\Sec_Backend\\Sec_Backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Work\\Y4.1\\Security\\Backend\\Sec_Backend\\Sec_Backend.csproj",
+        "projectUniqueName": "D:\\Work\\Y4.1\\Security\\git\\Sec_Backend\\Sec_Backend.csproj",
         "projectName": "Sec_Backend",
-        "projectPath": "D:\\Work\\Y4.1\\Security\\Backend\\Sec_Backend\\Sec_Backend.csproj",
+        "projectPath": "D:\\Work\\Y4.1\\Security\\git\\Sec_Backend\\Sec_Backend.csproj",
         "packagesPath": "C:\\Users\\focus\\.nuget\\packages\\",
-        "outputPath": "D:\\Work\\Y4.1\\Security\\Backend\\Sec_Backend\\obj\\",
+        "outputPath": "D:\\Work\\Y4.1\\Security\\git\\Sec_Backend\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\focus\\AppData\\Roaming\\NuGet\\NuGet.Config"

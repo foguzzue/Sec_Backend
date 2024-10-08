@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "V7uqRs8SBgY=",
+  "dgSpecHash": "I6y7C/tDmr4=",
   "success": true,
-  "projectFilePath": "D:\\Work\\Y4.1\\Security\\Backend\\Sec_Backend\\Sec_Backend.csproj",
+  "projectFilePath": "D:\\Work\\Y4.1\\Security\\git\\Sec_Backend\\Sec_Backend.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\focus\\.nuget\\packages\\awssdk.core\\3.7.100.14\\awssdk.core.3.7.100.14.nupkg.sha512",
     "C:\\Users\\focus\\.nuget\\packages\\awssdk.securitytoken\\3.7.100.14\\awssdk.securitytoken.3.7.100.14.nupkg.sha512",
