@@ -123,9 +123,17 @@ namespace Sec_Backend.Controllers
         }
 
         [HttpGet]
-        public async Task<IEnumerable<Users>> GetAllUsers()
+        public async Task<IActionResult> GetAllUsers()
         {
-            return await _context.Find(new BsonDocument()).ToListAsync();
+            var users = await _context.Find(new BsonDocument()).ToListAsync();
+
+            var result = users.Select(user => new 
+            {
+                Id = user.id,
+                Username = user.username 
+            });
+
+            return Ok(result);
         }
 
         [HttpDelete("{id}")]
