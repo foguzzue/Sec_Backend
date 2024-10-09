@@ -34,14 +34,14 @@ namespace Sec_Backend.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Register([FromBody] Users user)
         {
-            var existingUser = await _context.Find(u => u.Email == user.Email).FirstOrDefaultAsync();
+            var existingUser = await _context.Find(u => u.email == user.email).FirstOrDefaultAsync();
             if (existingUser != null)
             {
                 return BadRequest("Email is already registered.");
             }
 
-            user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
-            user.CreatedAt = DateTime.Now;
+            user.password = BCrypt.Net.BCrypt.HashPassword(user.password);
+            user.createdAt = DateTime.UtcNow.AddHours(7);
 
             await _context.InsertOneAsync(user);
 
@@ -54,14 +54,14 @@ namespace Sec_Backend.Controllers
         public async Task<IActionResult> Login([FromBody] UserLogin login)
         {
             // Find user by email
-            var existingUser = await _context.Find(u => u.Email == login.Email).FirstOrDefaultAsync();
+            var existingUser = await _context.Find(u => u.email == login.email).FirstOrDefaultAsync();
             if (existingUser == null)
             {
                 return Unauthorized("Invalid email or password.");
             }
 
             // Verify password
-            if (!BCrypt.Net.BCrypt.Verify(login.Password, existingUser.Password))
+            if (!BCrypt.Net.BCrypt.Verify(login.password, existingUser.password))
             {
                 return Unauthorized("Invalid email or password.");
             }
@@ -81,20 +81,20 @@ namespace Sec_Backend.Controllers
                 throw new ArgumentNullException(nameof(user), "User cannot be null.");
             }
 
-            if (string.IsNullOrEmpty(user.Id))
+            if (string.IsNullOrEmpty(user.id))
             {
-                throw new ArgumentException("User ID cannot be null or empty.", nameof(user.Id));
+                throw new ArgumentException("User ID cannot be null or empty.", nameof(user.id));
             }
 
-            if (string.IsNullOrEmpty(user.Email))
+            if (string.IsNullOrEmpty(user.email))
             {
-                throw new ArgumentException("User Email cannot be null or empty.", nameof(user.Email));
+                throw new ArgumentException("User Email cannot be null or empty.", nameof(user.email));
             }
 
             // สำหรับ Username ถ้า null ให้คืนค่าข้อความแสดงข้อผิดพลาด
-            if (string.IsNullOrEmpty(user.Username))
+            if (string.IsNullOrEmpty(user.username))
             {
-                throw new ArgumentException("User Username cannot be null or empty.", nameof(user.Username));
+                throw new ArgumentException("User Username cannot be null or empty.", nameof(user.username));
             }
 
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -110,9 +110,9 @@ namespace Sec_Backend.Controllers
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-            new Claim(ClaimTypes.NameIdentifier, user.Id),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Name, user.Username)
+            new Claim(ClaimTypes.NameIdentifier, user.id),
+            new Claim(ClaimTypes.Email, user.email),
+            new Claim(ClaimTypes.Name, user.username)
         }),
                 Expires = DateTime.UtcNow.AddHours(48), // Token valid for 48 hours
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
@@ -127,5 +127,23 @@ namespace Sec_Backend.Controllers
         {
             return await _context.Find(new BsonDocument()).ToListAsync();
         }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return BadRequest("User ID is required.");
+            }
+
+            var result = await _context.DeleteOneAsync(u => u.id == id);
+            if (result.DeletedCount == 0)
+            {
+                return NotFound("User not found.");
+            }
+
+            return Ok("User deleted successfully.");
+        }
+
     }
 }
