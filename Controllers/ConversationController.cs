@@ -87,7 +87,7 @@ namespace Sec_Backend.Controllers
                 });
             }
 
-            var sortedResults = results.OrderBy(r => r.lastest_timestamp ).ToList();
+            var sortedResults = results.OrderByDescending(r => r.latest_timestamp).ToList(); 
 
             return Ok(sortedResults);
         }
