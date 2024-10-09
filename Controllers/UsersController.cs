@@ -69,7 +69,7 @@ namespace Sec_Backend.Controllers
             // Generate JWT token with 48 hours expiration
             var token = GenerateJwtToken(existingUser);
 
-            return Ok(new { token });
+            return Ok(new { token, userId = existingUser.id });
         }
 
         // Generate JWT Token
