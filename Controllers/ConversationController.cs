@@ -3,6 +3,7 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using Microsoft.AspNetCore.Authorization;
 
+
 using Sec_Backend.Models;
 using Sec_Backend.Services;
 
@@ -69,8 +70,7 @@ namespace Sec_Backend.Controllers
                 return NotFound("No conversations found for the user.");
             }
 
-            // สร้างรายการผลลัพธ์ที่รวมข้อมูล username
-            var results = new List<object>();
+            var results = new List<dynamic>();
             foreach (var conversation in conversations)
             {
 #pragma warning disable CS8604 // Possible null reference argument.
@@ -87,8 +87,11 @@ namespace Sec_Backend.Controllers
                 });
             }
 
-            return Ok(results);
+            var sortedResults = results.OrderBy(r => r.lastest_timestamp ).ToList();
+
+            return Ok(sortedResults);
         }
+
 
         private async Task<Users> GetUserById(string userId)
         {
