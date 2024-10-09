@@ -85,12 +85,21 @@ namespace Sec_Backend.Controllers
                     var audioBytes = memoryStream.ToArray();
 
                     var encryptedAudioBytes = EncryptAudio(audioBytes);
+                    if (encryptedAudioBytes == null)
+                    {
+                        return StatusCode(500, "Audio encryption failed.");
+                    }
 
                     var fileName = Path.Combine("D:\\Work\\Y4.1\\Security\\voice", Guid.NewGuid().ToString() + Path.GetExtension(audioFile.FileName));
-
                     await System.IO.File.WriteAllBytesAsync(fileName, encryptedAudioBytes);
 
-                    newMessage.voice_path = HashFilePath(fileName);
+                    var hashFilePath = HashFilePath(fileName);
+                    if (string.IsNullOrEmpty(hashFilePath))
+                    {
+                        return StatusCode(500, "Failed to generate hash for file path.");
+                    }
+
+                    newMessage.voice_path = hashFilePath;
                 }
             }
             catch (Exception ex)
@@ -103,6 +112,7 @@ namespace Sec_Backend.Controllers
 
             return CreatedAtAction(nameof(GetMessageById), new { id = newMessage.id }, newMessage);
         }
+
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateMessage(string id, [FromBody] Messages updatedMessage)
@@ -171,10 +181,9 @@ namespace Sec_Backend.Controllers
         private byte[] EncryptAudio(byte[] audioBytes)
         {
 #pragma warning disable CS8604 // Possible null reference argument.
-            var key = Encoding.UTF8.GetBytes(_configuration["EncryptionSettings:Key"]);
-            var iv = Encoding.UTF8.GetBytes(_configuration["EncryptionSettings:IV"]);
+            var key = Convert.FromBase64String(_configuration["EncryptionSettings:Key"]);
+            var iv = Convert.FromBase64String(_configuration["EncryptionSettings:IV"]);
 #pragma warning restore CS8604 // Possible null reference argument.
-
             using (var aes = Aes.Create())
             {
                 aes.Key = key;
@@ -194,5 +203,6 @@ namespace Sec_Backend.Controllers
                 }
             }
         }
+
     }
 }
