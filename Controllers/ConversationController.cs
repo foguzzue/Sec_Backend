@@ -65,11 +65,6 @@ namespace Sec_Backend.Controllers
 
             var conversations = await _context.Find(filter).ToListAsync();
 
-            if (conversations == null || conversations.Count == 0)
-            {
-                return NotFound("No conversations found for the user.");
-            }
-
             var results = new List<dynamic>();
             foreach (var conversation in conversations)
             {
