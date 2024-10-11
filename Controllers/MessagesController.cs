@@ -106,8 +106,15 @@ namespace Sec_Backend.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
 
+            // อัปเดต timestamp
             newMessage.timestamp = DateTime.UtcNow.AddHours(7);
             await _context.InsertOneAsync(newMessage);
+
+            // หลังจากสร้างข้อความแล้ว ให้แก้ไข lastest_timestamp ในการสนทนาที่เกี่ยวข้อง
+            var updateDefinition = Builders<Messages>.Update.Set(m => m.timestamp, newMessage.timestamp);
+            var filter = Builders<Messages>.Filter.Eq(m => m.conversation_id, newMessage.conversation_id);
+
+            var updateResult = await _context.UpdateOneAsync(filter, updateDefinition);
 
             return CreatedAtAction(nameof(GetMessageById), new { id = newMessage.id }, newMessage);
         }
@@ -180,8 +187,6 @@ namespace Sec_Backend.Controllers
 
             byte[] encryptedAudio = await System.IO.File.ReadAllBytesAsync(filePath);
             byte[] decryptedAudio = DecryptAudio(encryptedAudio);
-            // var fileName = Path.Combine("D:\\Work\\Y4.1\\Security\\voice\\de", "test.m4a");
-            // await System.IO.File.WriteAllBytesAsync(fileName, decryptedAudio);
 
             return File(decryptedAudio, "audio/m4a");
         }
