@@ -19,7 +19,7 @@ nupkg/
 
 # Code Rush
 .cr/
-
+global.json
 # User-specific files
 *.suo
 *.user
