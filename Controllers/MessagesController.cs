@@ -91,8 +91,8 @@ namespace Sec_Backend.Controllers
                 return BadRequest("Digital signature verification failed.");
             }
 #pragma warning restore CS8604 // Possible null reference argument.
-            var fileName = Path.Combine("D:\\Work\\Y4.1\\Security\\voice\\de", "test.m4a");
-            await System.IO.File.WriteAllBytesAsync(fileName, decryptedAudio);
+            //var fileName = Path.Combine("D:\\Work\\Y4.1\\Security\\voice\\de", "test.m4a");
+            //await System.IO.File.WriteAllBytesAsync(fileName, decryptedAudio);
 
             return File(decryptedAudio, "audio/m4a");
         }
