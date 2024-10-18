@@ -2,17 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
-using System.IO;
-using System.Security.Cryptography;
 
 using Sec_Backend.Models;
 using Sec_Backend.Services;
-using System.Text;
-using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Security;
-using Org.BouncyCastle.Crypto;
 
 namespace Sec_Backend.Controllers
 {
@@ -167,10 +159,12 @@ namespace Sec_Backend.Controllers
             newMessage.timestamp = DateTime.UtcNow.AddHours(7);
             await _context.InsertOneAsync(newMessage);
 
-            var updateDefinition = Builders<Messages>.Update.Set(m => m.timestamp, newMessage.timestamp);
-            var filter = Builders<Messages>.Filter.Eq(m => m.conversation_id, newMessage.conversation_id);
+            var _conversation = _context.Database.GetCollection<Conversation>("conversation");
+            var conversation = await _conversation.Find(x => x.id == newMessage.conversation_id).FirstOrDefaultAsync();
 
-            var updateResult = await _context.UpdateOneAsync(filter, updateDefinition);
+            conversation.lastest_timestamp = newMessage.timestamp.Value;
+
+            await _conversation.ReplaceOneAsync(x => x.id == newMessage.conversation_id, conversation);
 
             return CreatedAtAction(nameof(GetMessageById), new { id = newMessage.id }, newMessage);
         }
