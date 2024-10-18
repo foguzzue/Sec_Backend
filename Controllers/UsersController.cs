@@ -15,13 +15,13 @@ namespace Sec_Backend.Controllers
     {
         private readonly IMongoCollection<Users> _context;
         private readonly CryptographySevice _cryptographySevice;
-        private readonly IMongoCollection<LoginAttemps> _loginAttemps;
+        private readonly IMongoCollection<LoginAttempts> _loginAttempts;
 
         public UsersController(MongoDbService mongoDbService, CryptographySevice cryptographySevice)
         {
             _context = mongoDbService.Database.GetCollection<Users>("users");
             _cryptographySevice = cryptographySevice;
-            _loginAttemps = mongoDbService.Database.GetCollection<LoginAttemps>("login_attemps");
+            _loginAttempts = mongoDbService.Database.GetCollection<LoginAttempts>("login_attempts");
         }
 
         [HttpGet]
@@ -58,13 +58,12 @@ namespace Sec_Backend.Controllers
 
             await _context.InsertOneAsync(user);
 
-            var loginAttempt = new LoginAttemps { user_id = user.id, attemp_count = 0 };
-            await _loginAttemps.InsertOneAsync(loginAttempt);
+            var loginAttempt = new LoginAttempts { user_id = user.id, attempt_count = 0 };
+            await _loginAttempts.InsertOneAsync(loginAttempt);
 
             return Ok("User registered successfully.");
         }
 
-        // LOGIN
         [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] UserLogin login)
@@ -73,79 +72,71 @@ namespace Sec_Backend.Controllers
 
             if (existingUser == null)
             {
-                return NotFound("This email does not exits");
+                return NotFound("This email does not exist");
             }
 
-            var loginAttempt = await _loginAttemps.Find(x => x.user_id == existingUser.id).FirstOrDefaultAsync();
+            var loginAttempt = await _loginAttempts.Find(x => x.user_id == existingUser.id).FirstOrDefaultAsync();
 
-            // Check if user is blocked
-            if (loginAttempt != null && loginAttempt.is_blocked == true)
+            // ตรวจสอบว่า user ถูกบล็อคหรือไม่
+            if (loginAttempt?.is_blocked == true)
             {
-                if (loginAttempt.last_attemp_time.HasValue && DateTime.UtcNow.AddHours(7) < loginAttempt.last_attemp_time.Value.AddMinutes(30))
+                if (loginAttempt.last_attempt_time.HasValue &&
+                    DateTime.UtcNow.AddHours(7) < loginAttempt.last_attempt_time.Value.AddMinutes(30))
                 {
+                    var remainingTime = loginAttempt.last_attempt_time.Value.AddMinutes(30) - DateTime.UtcNow.AddHours(7);
                     return Conflict(new
-                        {
-                            message = "Account is blocked. Please try again later.",
-                            remainingTime = (int)(loginAttempt.last_attemp_time.Value.AddMinutes(30) - DateTime.UtcNow.AddHours(7)).TotalMinutes
-                        });
+                    {
+                        message = "Account is blocked. Please try again later.",
+                        remainingTime = (int)remainingTime.TotalMinutes
+                    });
                 }
-                else
-                {
-                    // Reset the attempt count after 30 minutes
-                    loginAttempt.attemp_count = 0;
-                    loginAttempt.is_blocked = false;
-                    await _loginAttemps.ReplaceOneAsync(x => x.user_id == existingUser.id, loginAttempt);
-                }
+
+                // Reset the attempt count after 30 minutes
+                loginAttempt.attempt_count = 0;
+                loginAttempt.is_blocked = false;
+                await _loginAttempts.ReplaceOneAsync(x => x.user_id == existingUser.id, loginAttempt);
             }
 
-            if (loginAttempt != null)
+            // ตรวจสอบรหัสผ่าน
+            if (!BCrypt.Net.BCrypt.Verify(login.password, existingUser.password))
             {
-                // Validate password
-                if (!BCrypt.Net.BCrypt.Verify(login.password, existingUser.password))
-                {
-                    loginAttempt.attemp_count++;
-                    loginAttempt.last_attemp_time = DateTime.UtcNow.AddHours(7);
+                loginAttempt ??= new LoginAttempts { user_id = existingUser.id, attempt_count = 0 }; // Initialize if null
+                loginAttempt.attempt_count++;
+                loginAttempt.last_attempt_time = DateTime.UtcNow.AddHours(7);
 
 #pragma warning disable CS8629 // Nullable value type may be null.
-                    int remainingAttempts = (int)(5 - loginAttempt.attemp_count);
+                int remainingAttempts = Math.Max(0, 5 - (int)loginAttempt.attempt_count); // คำนวณจำนวนครั้งที่เหลือ
 #pragma warning restore CS8629 // Nullable value type may be null.
 
-                    if (loginAttempt.attemp_count >= 5)
-                    {
-                        loginAttempt.is_blocked = true;
-
-                        await _loginAttemps.ReplaceOneAsync(x => x.user_id == existingUser.id, loginAttempt);
-                        return Conflict(new
-                        {
-                            message = "Account is blocked. Please try again later.",
-                            remainingTime = (int)(loginAttempt.last_attemp_time.Value.AddMinutes(30) - DateTime.UtcNow.AddHours(7)).TotalMinutes
-                        });
-                    }
-
-                    await _loginAttemps.ReplaceOneAsync(x => x.user_id == existingUser.id, loginAttempt);
-
-                    // คืนค่าจำนวนครั้งที่เหลือ
-                    return Unauthorized(new { message = "Invalid email or password.", remainingAttempts });
-                }
-
-                // Successful login
-                else
+                if (loginAttempt.attempt_count >= 5)
                 {
-                    // Reset attempt count
-                    loginAttempt.attemp_count = 0;
-                    loginAttempt.is_blocked = false;
-                    await _loginAttemps.ReplaceOneAsync(x => x.user_id == existingUser.id, loginAttempt);
+                    loginAttempt.is_blocked = true;
+                    await _loginAttempts.ReplaceOneAsync(x => x.user_id == existingUser.id, loginAttempt);
+                    var remainingTime = loginAttempt.last_attempt_time.Value.AddMinutes(30) - DateTime.UtcNow.AddHours(7);
+                    return Conflict(new
+                    {
+                        message = "Account is blocked. Please try again later.",
+                        remainingTime = (int)remainingTime.TotalMinutes
+                    });
                 }
 
+                await _loginAttempts.ReplaceOneAsync(x => x.user_id == existingUser.id, loginAttempt);
+                return Unauthorized(new { message = "Invalid email or password.", remainingAttempts });
             }
-            else
+
+            // Successful login
+            if (loginAttempt != null)
             {
-                return NotFound("This email does not exits");
+                // Reset attempt count
+                loginAttempt.attempt_count = 0;
+                loginAttempt.is_blocked = false;
+                await _loginAttempts.ReplaceOneAsync(x => x.user_id == existingUser.id, loginAttempt);
             }
 
             var token = _cryptographySevice.GenerateJwtToken(existingUser);
             return Ok(new { token, userId = existingUser.id });
         }
+
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(string id)

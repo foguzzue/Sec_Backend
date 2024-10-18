@@ -62,6 +62,24 @@ namespace Sec_Backend.Controllers
             return Ok(message);
         }
 
+        [HttpGet("get-all-by-conversation-id/{conversationId}")]
+        public async Task<IActionResult> GetAllMessagesByConversationId(string conversationId)
+        {
+            if (string.IsNullOrEmpty(conversationId))
+            {
+                return BadRequest("Conversation ID is required.");
+            }
+
+            if (!ObjectId.TryParse(conversationId, out _))
+            {
+                return BadRequest("Invalid Conversation ID format.");
+            }
+
+            var messages = await _context.Find(m => m.conversation_id == conversationId).ToListAsync();
+
+            return Ok(messages);
+        }
+
         [HttpGet("get-audio")]
         public async Task<IActionResult> GetAudio(string voice_path)
         {
@@ -91,8 +109,8 @@ namespace Sec_Backend.Controllers
                 return BadRequest("Digital signature verification failed.");
             }
 #pragma warning restore CS8604 // Possible null reference argument.
-            //var fileName = Path.Combine("D:\\Work\\Y4.1\\Security\\voice\\de", "test.m4a");
-            //await System.IO.File.WriteAllBytesAsync(fileName, decryptedAudio);
+            // var fileName = Path.Combine("D:\\Work\\Y4.1\\Security\\voice\\de", "test.m4a");
+            // await System.IO.File.WriteAllBytesAsync(fileName, decryptedAudio);
 
             return File(decryptedAudio, "audio/m4a");
         }
