@@ -96,12 +96,10 @@ namespace Sec_Backend.Services
                 using (var sha256 = SHA256.Create())
                 {
                     var hash = sha256.ComputeHash(data);
-
                     return rsa.SignHash(hash, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
                 }
             }
         }
-
 
         // Verify the digital signature using the public key
         public bool VerifySignature(byte[] data, byte[] signature, string userId)
@@ -112,11 +110,7 @@ namespace Sec_Backend.Services
                 rsa.ImportRSAPublicKey(Convert.FromBase64String(publicKey), out _);
                 using (var sha256 = SHA256.Create())
                 {
-                    // แฮชข้อมูล
                     var hash = sha256.ComputeHash(data);
-
-                    // ตรวจสอบลายเซ็น
-                    // signature ที่เก็บในฐานข้อมูลต้องถูกแฮชแล้ว 
                     return rsa.VerifyHash(hash, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
                 }
             }
