@@ -17,6 +17,11 @@ namespace Sec_Backend.Models
 
         [BsonElement("username")]
         public string? username { get; set; }
+        [BsonElement("private_key")]
+        public string? privateKey { get; set; }
+
+        [BsonElement("public_key")]
+        public string? publicKey { get; set; }
 
         [BsonElement("createdAt")]
         public DateTime createdAt { get; set; }

@@ -23,11 +23,13 @@ namespace Sec_Backend.Controllers
     {
         private readonly IMongoCollection<Messages> _context;
         private readonly IConfiguration _configuration;
+        private readonly CryptographySevice _cryptographySevice;
 
-        public MessagesController(MongoDbService mongoDbService, IConfiguration configuration)
+        public MessagesController(MongoDbService mongoDbService, IConfiguration configuration, CryptographySevice cryptographySevice)
         {
             _context = mongoDbService.Database.GetCollection<Messages>("messages");
             _configuration = configuration;
+            _cryptographySevice = cryptographySevice;
         }
 
         [HttpGet]
@@ -60,6 +62,41 @@ namespace Sec_Backend.Controllers
             return Ok(message);
         }
 
+        [HttpGet("get-audio")]
+        public async Task<IActionResult> GetAudio(string voice_path)
+        {
+            string decryptedPath = _cryptographySevice.DecryptPathBlowfish(voice_path);
+            string filePath = Path.Combine("path_to_encrypted_files_directory", $"{decryptedPath}");
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                return NotFound("File not found." + filePath);
+            }
+
+            byte[] encryptedAudio = await System.IO.File.ReadAllBytesAsync(filePath);
+            byte[] decryptedAudio = _cryptographySevice.DecryptAudioAES(encryptedAudio);
+
+            var message = await _context.Find(m => m.voice_path == voice_path).FirstOrDefaultAsync();
+
+#pragma warning disable CS8604 // Possible null reference argument.
+            if (message == null)
+            {
+                return BadRequest("Message not found.");
+            }
+
+            // **ตรวจสอบ Digital Signature**
+            var signatureBytes = Convert.FromBase64String(message.digital_sig);
+            if (!_cryptographySevice.VerifySignature(decryptedAudio, signatureBytes, message.sender_id))
+            {
+                return BadRequest("Digital signature verification failed.");
+            }
+#pragma warning restore CS8604 // Possible null reference argument.
+            var fileName = Path.Combine("D:\\Work\\Y4.1\\Security\\voice\\de", "test.m4a");
+            await System.IO.File.WriteAllBytesAsync(fileName, decryptedAudio);
+
+            return File(decryptedAudio, "audio/m4a");
+        }
+
         [HttpPost("create")]
         public async Task<IActionResult> CreateMessage([FromForm] Messages newMessage, IFormFile audioFile)
         {
@@ -87,7 +124,7 @@ namespace Sec_Backend.Controllers
                     await audioFile.CopyToAsync(memoryStream);
                     var audioBytes = memoryStream.ToArray();
 
-                    var encryptedAudioBytes = EncryptAudio(audioBytes);
+                    var encryptedAudioBytes = _cryptographySevice.EncryptAudioAES(audioBytes);
                     if (encryptedAudioBytes == null)
                     {
                         return StatusCode(500, "Audio encryption failed.");
@@ -96,9 +133,12 @@ namespace Sec_Backend.Controllers
                     var fileName = Path.Combine("D:\\Work\\Y4.1\\Security\\voice", Guid.NewGuid().ToString() + Path.GetExtension(audioFile.FileName));
                     await System.IO.File.WriteAllBytesAsync(fileName, encryptedAudioBytes);
 
-                    var hashFilePath = EncryptPath(fileName);
-
+                    var hashFilePath = _cryptographySevice.EncryptPathBlowfish(fileName);
                     newMessage.voice_path = hashFilePath;
+
+                    // **สร้าง Digital Signature**
+                    var digitalSignature = _cryptographySevice.SignData(audioBytes, newMessage.sender_id);
+                    newMessage.digital_sig = Convert.ToBase64String(digitalSignature);  // เก็บลายเซ็นในฐานข้อมูล
                 }
             }
             catch (Exception ex)
@@ -106,11 +146,9 @@ namespace Sec_Backend.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
 
-            // อัปเดต timestamp
             newMessage.timestamp = DateTime.UtcNow.AddHours(7);
             await _context.InsertOneAsync(newMessage);
 
-            // หลังจากสร้างข้อความแล้ว ให้แก้ไข lastest_timestamp ในการสนทนาที่เกี่ยวข้อง
             var updateDefinition = Builders<Messages>.Update.Set(m => m.timestamp, newMessage.timestamp);
             var filter = Builders<Messages>.Filter.Eq(m => m.conversation_id, newMessage.conversation_id);
 
@@ -143,7 +181,6 @@ namespace Sec_Backend.Controllers
             existingMessage.conversation_id = updatedMessage.conversation_id ?? existingMessage.conversation_id;
             existingMessage.sender_id = updatedMessage.sender_id ?? existingMessage.sender_id;
             existingMessage.receiver_id = updatedMessage.receiver_id ?? existingMessage.receiver_id;
-            existingMessage.voice_path = updatedMessage.voice_path ?? existingMessage.voice_path;
             existingMessage.timestamp = DateTime.UtcNow.AddHours(7);
 
             await _context.ReplaceOneAsync(m => m.id == id, existingMessage);
@@ -173,124 +210,5 @@ namespace Sec_Backend.Controllers
 
             return NoContent();
         }
-
-        [HttpGet("get-audio")]
-        public async Task<IActionResult> GetAudio(string voice_path)
-        {
-            string decryptedPath = DecryptPath(voice_path);
-
-            string filePath = Path.Combine("path_to_encrypted_files_directory", $"{decryptedPath}");
-            if (!System.IO.File.Exists(filePath))
-            {
-                return NotFound("File not found." + filePath);
-            }
-
-            byte[] encryptedAudio = await System.IO.File.ReadAllBytesAsync(filePath);
-            byte[] decryptedAudio = DecryptAudio(encryptedAudio);
-
-            return File(decryptedAudio, "audio/m4a");
-        }
-
-        private string EncryptPath(string path)
-        {
-#pragma warning disable CS8604 // Possible null reference argument.
-            byte[] key = Convert.FromBase64String(_configuration["BlowfishSettings:Key"]);
-#pragma warning restore CS8604 // Possible null reference argument.
-            IBufferedCipher cipher = CipherUtilities.GetCipher("Blowfish/ECB/PKCS7");
-            cipher.Init(true, new KeyParameter(key));
-
-            byte[] inputBytes = Encoding.UTF8.GetBytes(path);
-            byte[] outputBytes = cipher.DoFinal(inputBytes);
-
-            return Convert.ToBase64String(outputBytes);
-        }
-
-        private string DecryptPath(string encryptedPath)
-        {
-#pragma warning disable CS8604 // Possible null reference argument.
-            byte[] key = Convert.FromBase64String(_configuration["BlowfishSettings:Key"]);
-#pragma warning restore CS8604 // Possible null reference argument.
-            IBufferedCipher cipher = CipherUtilities.GetCipher("Blowfish/ECB/PKCS7");
-            cipher.Init(false, new KeyParameter(key));
-
-            byte[] inputBytes = Convert.FromBase64String(encryptedPath);
-            byte[] outputBytes = cipher.DoFinal(inputBytes);
-
-            return Encoding.UTF8.GetString(outputBytes);
-        }
-
-        private byte[] EncryptAudio(byte[] audioBytes)
-        {
-#pragma warning disable CS8604 // Possible null reference argument.
-            var key = Convert.FromBase64String(_configuration["EncryptionSettings:Key"]);
-            var iv = Convert.FromBase64String(_configuration["EncryptionSettings:IV"]);
-#pragma warning restore CS8604 // Possible null reference argument.
-            using (var aes = Aes.Create())
-            {
-                aes.Key = key;
-                aes.IV = iv;
-
-                using (var encryptor = aes.CreateEncryptor(aes.Key, aes.IV))
-                {
-                    using (var msEncrypt = new MemoryStream())
-                    {
-                        using (var csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
-                        {
-                            csEncrypt.Write(audioBytes, 0, audioBytes.Length);
-                            csEncrypt.FlushFinalBlock();
-                            return msEncrypt.ToArray();
-                        }
-                    }
-                }
-            }
-        }
-
-        private byte[] DecryptAudio(byte[] encryptedAudioBytes)
-        {
-#pragma warning disable CS8604 // Possible null reference argument.
-            byte[] key = Convert.FromBase64String(_configuration["EncryptionSettings:Key"]);
-            byte[] iv = Convert.FromBase64String(_configuration["EncryptionSettings:IV"]);
-#pragma warning restore CS8604 // Possible null reference argument.
-
-            using (var aes = Aes.Create())
-            {
-                aes.Key = key;
-                aes.IV = iv;
-
-                using (var decryptor = aes.CreateDecryptor(aes.Key, aes.IV))
-                {
-                    using (var msDecrypt = new MemoryStream(encryptedAudioBytes))
-                    {
-                        using (var csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read))
-                        {
-                            using (var msResult = new MemoryStream())
-                            {
-                                csDecrypt.CopyTo(msResult);
-                                return msResult.ToArray();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        [HttpGet("get-all-by-conversation-id/{conversationId}")]
-        public async Task<IActionResult> GetAllMessagesByConversationId(string conversationId)
-        {
-            if (string.IsNullOrEmpty(conversationId))
-            {
-                return BadRequest("Conversation ID is required.");
-            }
-
-            if (!ObjectId.TryParse(conversationId, out _))
-            {
-                return BadRequest("Invalid Conversation ID format.");
-            }
-
-            var messages = await _context.Find(m => m.conversation_id == conversationId).ToListAsync();
-
-            return Ok(messages);
-        }
-
     }
 }

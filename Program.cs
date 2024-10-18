@@ -9,6 +9,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
 builder.Services.AddSingleton<MongoDbService>();
+builder.Services.AddSingleton<CryptographySevice>();
 
 var secretKey = builder.Configuration["Jwt:SecretKey"];
 if (string.IsNullOrEmpty(secretKey))
@@ -23,7 +24,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer("JwtBearer", options =>
 {
-    var key = Encoding.ASCII.GetBytes(secretKey); // Use secretKey safely
+    var key = Encoding.ASCII.GetBytes(secretKey);
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,

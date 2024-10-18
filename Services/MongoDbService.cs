@@ -9,7 +9,6 @@ namespace Sec_Backend.Services
 
         public MongoDbService(IConfiguration configuration){
             _configuration = configuration;
-
             var connectionString = _configuration.GetConnectionString("DbConnection");
             var databaseName = _configuration.GetConnectionString("DatabaseName");
             var client = new MongoClient(connectionString);

@@ -51,7 +51,7 @@ namespace Sec_Backend.Controllers
         }
 
         [HttpGet("user/{userId}")]
-        public async Task<IActionResult> GetConversationsByUser(string userId)
+        public async Task<IActionResult> GetConversationsByUserId(string userId)
         {
             if (string.IsNullOrEmpty(userId))
             {

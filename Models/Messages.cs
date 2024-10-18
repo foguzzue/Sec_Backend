@@ -15,14 +15,17 @@ namespace Sec_Backend.Models
 
         [BsonElement("sender_id")]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string? sender_id { get; set; } 
+        public string? sender_id { get; set; }
 
         [BsonElement("receiver_id")]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string? receiver_id { get; set; } 
+        public string? receiver_id { get; set; }
 
         [BsonElement("voice_path")]
-        public string? voice_path { get; set;}
+        public string? voice_path { get; set; }
+
+        [BsonElement("digital_sig")]
+        public string? digital_sig { get; set; }
 
         [BsonElement("timestamp")]
         public DateTime? timestamp { get; set; }
