@@ -73,7 +73,7 @@ namespace Sec_Backend.Controllers
 
             if (existingUser == null)
             {
-                return NotFound("Invalid email or password.");
+                return NotFound("This email does not exits");
             }
 
             var loginAttempt = await _loginAttemps.Find(x => x.user_id == existingUser.id).FirstOrDefaultAsync();
@@ -83,7 +83,11 @@ namespace Sec_Backend.Controllers
             {
                 if (loginAttempt.last_attemp_time.HasValue && DateTime.UtcNow.AddHours(7) < loginAttempt.last_attemp_time.Value.AddMinutes(30))
                 {
-                    return Conflict("Account is blocked. Please try again later.");
+                    return Conflict(new
+                        {
+                            message = "Account is blocked. Please try again later.",
+                            remainingTime = (int)(loginAttempt.last_attemp_time.Value.AddMinutes(30) - DateTime.UtcNow.AddHours(7)).TotalMinutes
+                        });
                 }
                 else
                 {
@@ -103,13 +107,19 @@ namespace Sec_Backend.Controllers
                     loginAttempt.last_attemp_time = DateTime.UtcNow.AddHours(7);
 
 #pragma warning disable CS8629 // Nullable value type may be null.
-                    int remainingAttempts = (int)(10 - loginAttempt.attemp_count);
+                    int remainingAttempts = (int)(5 - loginAttempt.attemp_count);
 #pragma warning restore CS8629 // Nullable value type may be null.
 
-                    if (loginAttempt.attemp_count >= 10)
+                    if (loginAttempt.attemp_count >= 5)
                     {
                         loginAttempt.is_blocked = true;
-                        return Conflict("Account is blocked. Please try again later.");
+
+                        await _loginAttemps.ReplaceOneAsync(x => x.user_id == existingUser.id, loginAttempt);
+                        return Conflict(new
+                        {
+                            message = "Account is blocked. Please try again later.",
+                            remainingTime = (int)(loginAttempt.last_attemp_time.Value.AddMinutes(30) - DateTime.UtcNow.AddHours(7)).TotalMinutes
+                        });
                     }
 
                     await _loginAttemps.ReplaceOneAsync(x => x.user_id == existingUser.id, loginAttempt);
@@ -130,7 +140,7 @@ namespace Sec_Backend.Controllers
             }
             else
             {
-                return NotFound("Invalid email or password.");
+                return NotFound("This email does not exits");
             }
 
             var token = _cryptographySevice.GenerateJwtToken(existingUser);
